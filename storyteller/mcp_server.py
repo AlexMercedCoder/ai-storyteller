@@ -59,5 +59,19 @@ def list_characters(story_id: int) -> str:
         return "No characters found."
     return "\n".join([f"{c['id']}: {c['name']}" for c in chars])
 
+@mcp.tool()
+def set_world_state(story_id: int, key: str, value: str) -> str:
+    """Sets a key-value pair in the world state."""
+    db = get_db()
+    db.set_world_state(story_id, key, value)
+    return f"Set {key} to {value}."
+
+@mcp.tool()
+def get_world_state(story_id: int) -> str:
+    """Gets the world state."""
+    db = get_db()
+    state = db.get_world_state(story_id)
+    return str(state)
+
 if __name__ == "__main__":
     mcp.run()

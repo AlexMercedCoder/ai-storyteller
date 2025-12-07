@@ -1,5 +1,5 @@
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Input, Static, ListView, ListItem, Label
+from textual.widgets import Header, Footer, Input, Static, ListView, ListItem, Label, TabbedContent, TabPane, Markdown as TextualMarkdown
 from textual.containers import Container, Horizontal, Vertical
 from textual.message import Message
 import asyncio
@@ -13,6 +13,37 @@ import json
 class ChatMessage(Static):
     """A widget to display a chat message."""
     pass
+
+class CharacterSheet(Static):
+    """Displays character stats."""
+    def compose(self) -> ComposeResult:
+        yield Label("Character Stats", classes="header")
+        yield Label("HP: 20/20", id="hp-label")
+        yield Label("Gold: 50", id="gold-label")
+        yield Label("Inventory:", classes="header")
+        yield ListView(id="inventory-list")
+
+    def update_stats(self, hp: int, gold: int, inventory: list):
+        self.query_one("#hp-label").update(f"HP: {hp}/20")
+        self.query_one("#gold-label").update(f"Gold: {gold}")
+        # Update inventory list (simplified)
+
+class LoreBrowser(Static):
+    """Browses lore files."""
+    def __init__(self, lore_manager: LoreManager):
+        super().__init__()
+        self.lore_manager = lore_manager
+
+    def compose(self) -> ComposeResult:
+        topics = self.lore_manager.get_all_lore_topics()
+        yield Label("Lore Topics", classes="header")
+        yield ListView(*[ListItem(Label(topic), name=topic) for topic in topics], id="lore-list")
+        yield Container(id="lore-content")
+
+    def on_list_view_selected(self, message: ListView.Selected):
+        topic = message.item.name
+        content = self.lore_manager.get_lore(topic)
+        self.query_one("#lore-content").mount(TextualMarkdown(content))
 
 class StorytellerApp(App):
     """A Textual app for Storyteller."""
@@ -28,6 +59,15 @@ class StorytellerApp(App):
         background: $panel;
         border-right: vkey $accent;
         height: 100%;
+        padding: 1;
+    }
+
+    .header {
+        text-align: center;
+        text-style: bold;
+        background: $primary;
+        color: $text;
+        margin-bottom: 1;
     }
 
     .main-content {
@@ -106,20 +146,20 @@ class StorytellerApp(App):
         yield Header()
         
         with Vertical(classes="sidebar"):
-            yield Label("Stats & Inventory")
-            # Placeholder for stats
-            yield Static("HP: 10/10\nGold: 50")
+            yield CharacterSheet()
 
         with Vertical(classes="main-content"):
-            yield Container(id="chat-history")
-            yield Input(placeholder="What do you want to do?", id="user-input")
+            with TabbedContent():
+                with TabPane("Chat"):
+                    yield Container(id="chat-history")
+                    yield Input(placeholder="What do you want to do?", id="user-input")
+                with TabPane("Lore"):
+                    yield LoreBrowser(self.lore)
 
         with Vertical(classes="sidebar"):
-            yield Label("Lore & Notes")
-            yield ListView(
-                ListItem(Label("The Kingdom")),
-                ListItem(Label("The Dragon")),
-            )
+            yield Label("World State")
+            # Placeholder for world state
+            yield Static("Location: Village\nTime: Night")
 
         yield Footer()
 

@@ -1,6 +1,6 @@
 [project]
 name = "ai-storyteller-cli"
-version = "0.1.0"
+version = "0.2.0"
 description = "AI Storyteller and DM Assistant"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,7 +15,8 @@ dependencies = [
     "pydantic>=2.0.0",
     "lancedb",
     "sentence-transformers",
-    "textual"
+    "textual",
+    "pandas"
 ]
 
 [project.scripts]

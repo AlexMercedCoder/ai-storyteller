@@ -96,6 +96,61 @@ def generate_quest(
     
     console.print(Markdown(response))
 
+@dm_app.command("dungeon")
+def generate_dungeon(
+    rooms: int = typer.Option(5, help="Number of rooms")
+):
+    """Generate a random dungeon."""
+    from storyteller.procedural import DungeonGenerator
+    gen = DungeonGenerator(num_rooms=rooms)
+    dungeon = gen.generate()
+    
+    console.print(f"[bold red]{dungeon['name']}[/bold red]")
+    for room in dungeon["rooms"]:
+        console.print(f"[bold]Room {room['id']}: {room['type']}[/bold]")
+        console.print(f"  Encounter: {room['encounter']}")
+        console.print(f"  Description: {room['description']}")
+        console.print("")
+
+@dm_app.command("loot")
+def generate_loot(
+    table_type: str = typer.Option("generic", help="Loot table type: generic, magic, treasure")
+):
+    """Generate random loot."""
+    from storyteller.procedural import LootTable
+    
+    tables = {
+        "generic": {"Gold Coin": 50, "Torch": 20, "Rope": 15, "Potion": 10, "Gem": 5},
+        "magic": {"Potion of Healing": 40, "Scroll of Fireball": 30, "+1 Sword": 10, "Ring of Protection": 10, "Wand": 10},
+        "treasure": {"Gold Pouch": 40, "Silver Bar": 30, "Ruby": 15, "Diamond": 10, "Crown": 5}
+    }
+    
+    items = tables.get(table_type, tables["generic"])
+    loot = LootTable(items).roll()
+    console.print(f"[bold yellow]You found: {loot}[/bold yellow]")
+
+@app.command()
+def export(
+    story_id: int = typer.Option(..., help="ID of the story to export"),
+    output: str = typer.Option("story_export.html", help="Output filename"),
+    storybase: str = typer.Option("default", help="Name of the story database")
+):
+    """Export a story to HTML."""
+    from storyteller.export import StoryExporter
+    exporter = StoryExporter(storybase)
+    exporter.export_html(story_id, output)
+    console.print(f"[green]Story exported to {output}[/green]")
+
+@app.command()
+def pack_lore(
+    output: str = typer.Option("lore_pack.zip", help="Output filename")
+):
+    """Pack the lore directory into a zip file."""
+    from storyteller.export import LorePacker
+    packer = LorePacker()
+    packer.pack(output)
+    console.print(f"[green]Lore packed to {output}[/green]")
+
 @app.command()
 def validate():
     """Validate lore files."""
