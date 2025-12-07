@@ -6,7 +6,7 @@ from rich.panel import Panel
 from storyteller.db import DatabaseManager
 from storyteller.lore import LoreManager
 from storyteller.ai import AIGateway
-from storyteller.mcp_server import mcp
+from storyteller.mcp_server import mcp, get_lore, search_lore, get_story_summary, update_story_summary, roll_dice, list_characters
 from storyteller.mcp_client import MCPClientManager
 import asyncio
 import json
@@ -113,14 +113,56 @@ async def chat_loop(provider: str, model: str, story_id: int, storybase: str):
     ai = AIGateway()
     mcp_client = MCPClientManager()
 
+    # Define Internal Tools
+    internal_tools = [
+        {
+            "name": "get_lore",
+            "description": "Retrieves lore about a specific topic.",
+            "function": get_lore,
+            "server_name": "internal"
+        },
+        {
+            "name": "search_lore",
+            "description": "Searches all lore files for a query.",
+            "function": search_lore,
+            "server_name": "internal"
+        },
+        {
+            "name": "get_story_summary",
+            "description": "Retrieves the summary of a story.",
+            "function": get_story_summary,
+            "server_name": "internal"
+        },
+        {
+            "name": "update_story_summary",
+            "description": "Updates the summary of a story.",
+            "function": update_story_summary,
+            "server_name": "internal"
+        },
+        {
+            "name": "roll_dice",
+            "description": "Rolls a number of dice with a given number of sides.",
+            "function": roll_dice,
+            "server_name": "internal"
+        },
+        {
+            "name": "list_characters",
+            "description": "Lists all characters in a story.",
+            "function": list_characters,
+            "server_name": "internal"
+        }
+    ]
+
     # Connect to external MCP servers
     console.print("[dim]Connecting to external MCP servers...[/dim]")
     await mcp_client.connect_all()
     
     # Fetch available tools
-    tools = await mcp_client.get_all_tools()
+    external_tools = await mcp_client.get_all_tools()
+    tools = internal_tools + (external_tools if external_tools else [])
+    
     if tools:
-        console.print(f"[green]Loaded {len(tools)} external tools.[/green]")
+        console.print(f"[green]Loaded {len(tools)} tools ({len(internal_tools)} internal, {len(external_tools) if external_tools else 0} external).[/green]")
         for tool in tools:
             console.print(f"  - [cyan]{tool['name']}[/cyan] ({tool.get('server_name')})")
 
@@ -195,7 +237,29 @@ async def chat_loop(provider: str, model: str, story_id: int, storybase: str):
                     
                     if server_name:
                         console.print(f"[dim]Calling tool {tool_name} on {server_name}...[/dim]")
-                        tool_result = await mcp_client.call_tool(server_name, tool_name, tool_args)
+                        
+                        if server_name == "internal":
+                            # Execute internal tool
+                            tool_func = next((t["function"] for t in internal_tools if t["name"] == tool_name), None)
+                            if tool_func:
+                                # Inspect function signature to pass correct args
+                                # For simplicity, we'll try to pass args as kwargs
+                                # Note: Some internal tools need story_id which might not be in args if AI didn't provide it
+                                # We can inject it if missing and required
+                                import inspect
+                                sig = inspect.signature(tool_func)
+                                if "story_id" in sig.parameters and "story_id" not in tool_args:
+                                    tool_args["story_id"] = story_id
+                                
+                                try:
+                                    tool_result = tool_func(**tool_args)
+                                except Exception as e:
+                                    tool_result = f"Error executing internal tool: {e}"
+                            else:
+                                tool_result = "Error: Internal tool function not found."
+                        else:
+                            # Execute external tool
+                            tool_result = await mcp_client.call_tool(server_name, tool_name, tool_args)
                         
                         # Feed result back to AI
                         # For simplicity, we just print it and ask AI to continue
