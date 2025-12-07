@@ -20,6 +20,10 @@ Storyteller is a CLI-based application that uses Large Language Models (LLMs) to
 | **[Setup Guide](docs/setup.md)** | Installation, API keys, and initialization. |
 | **[GitHub & Template Guide](docs/github_setup.md)** | Cloning, setup, and creating custom distributions. |
 | **[Database Guide](docs/db.md)** | Understanding the schema and managing save files. |
+| **[RAG & Vector Search](docs/rag.md)** | How the AI remembers lore using vector embeddings. |
+| **[Plugin System](docs/plugins.md)** | Extending Storyteller with custom Python scripts. |
+| **[Textual TUI](docs/tui.md)** | Using the rich terminal interface. |
+| **[Publishing Guide](docs/publishing.md)** | Packaging and distributing the library. |
 | **[Quick Start](docs/usage.md)** | Basic usage instructions. |
 | **[Chat Interface](docs/chat.md)** | Deep dive into how to play and interact. |
 | **[CLI Reference](docs/cli.md)** | Complete command list (`start`, `serve`, `dm-assist`). |

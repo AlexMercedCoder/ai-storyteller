@@ -6,7 +6,7 @@ from rich.panel import Panel
 from storyteller.db import DatabaseManager
 from storyteller.lore import LoreManager
 from storyteller.ai import AIGateway
-from storyteller.mcp_server import mcp, get_lore, search_lore, get_story_summary, update_story_summary, roll_dice, list_characters
+from storyteller.mcp_server import mcp, get_lore, search_lore, get_story_summary, update_story_summary, roll_dice, list_characters, set_world_state, get_world_state
 from storyteller.mcp_client import MCPClientManager
 import asyncio
 import json
@@ -97,17 +97,51 @@ def generate_quest(
     console.print(Markdown(response))
 
 @app.command()
+def validate():
+    """Validate lore files."""
+    lore_dir = Path("lore")
+    if not lore_dir.exists():
+        console.print("[red]Lore directory not found.[/red]")
+        return
+
+    errors = []
+    for file_path in lore_dir.glob("*.md"):
+        if file_path.stat().st_size == 0:
+            errors.append(f"{file_path.name}: Empty file")
+        # Add more checks here (e.g., header format)
+
+    if errors:
+        console.print("[red]Validation failed:[/red]")
+        for error in errors:
+            console.print(f"- {error}")
+    else:
+        console.print("[green]All lore files are valid.[/green]")
+
+@app.command()
 def start(
     provider: str = typer.Option("openai", help="AI Provider: openai, anthropic, gemini"),
     model: str = typer.Option("gpt-4o", help="Model name"),
     story_id: int = typer.Option(None, help="ID of an existing story to resume"),
-    storybase: str = typer.Option("default", help="Name of the story database")
+    storybase: str = typer.Option("default", help="Name of the story database"),
+    campaign_id: int = typer.Option(None, help="ID of a campaign template to start from"),
+    tui: bool = typer.Option(False, help="Use Textual TUI")
 ):
     """Start the chat interface."""
-    # We need to run the async chat loop
-    asyncio.run(chat_loop(provider, model, story_id, storybase))
+    if tui:
+        from storyteller.tui import StorytellerApp
+        # We need to ensure story_id exists before starting TUI
+        db = DatabaseManager(storybase)
+        if not story_id:
+            name = Prompt.ask("Enter a name for your new story")
+            story_id = db.create_story(name)
+        
+        app = StorytellerApp(provider, model, story_id, storybase)
+        app.run()
+    else:
+        # We need to run the async chat loop
+        asyncio.run(chat_loop(provider, model, story_id, storybase, campaign_id))
 
-async def chat_loop(provider: str, model: str, story_id: int, storybase: str):
+async def chat_loop(provider: str, model: str, story_id: int, storybase: str, campaign_id: int = None):
     db = DatabaseManager(storybase)
     lore = LoreManager()
     ai = AIGateway()
@@ -150,8 +184,26 @@ async def chat_loop(provider: str, model: str, story_id: int, storybase: str):
             "description": "Lists all characters in a story.",
             "function": list_characters,
             "server_name": "internal"
+        },
+        {
+            "name": "set_world_state",
+            "description": "Sets a key-value pair in the world state.",
+            "function": set_world_state,
+            "server_name": "internal"
+        },
+        {
+            "name": "get_world_state",
+            "description": "Gets the world state.",
+            "function": get_world_state,
+            "server_name": "internal"
         }
     ]
+
+    # Load Plugins
+    from storyteller.plugins import PluginManager
+    plugin_manager = PluginManager()
+    plugin_tools = plugin_manager.load_plugins()
+    internal_tools.extend(plugin_tools)
 
     # Connect to external MCP servers
     console.print("[dim]Connecting to external MCP servers...[/dim]")
@@ -168,6 +220,8 @@ async def chat_loop(provider: str, model: str, story_id: int, storybase: str):
 
     if not story_id:
         name = Prompt.ask("Enter a name for your new story")
+        # If campaign_id is provided, we could potentially seed the story with campaign-specific details
+        # For now, we just create a blank story
         story_id = db.create_story(name)
         console.print(f"[green]Created new story: {name} (ID: {story_id})[/green]")
     else:
@@ -181,6 +235,7 @@ async def chat_loop(provider: str, model: str, story_id: int, storybase: str):
     console.print("[bold yellow]Welcome to Storyteller! Type 'exit' to quit.[/bold yellow]")
     
     story_summary = db.get_story(story_id).get("summary", "")
+    turn_count = 0
     
     try:
         while True:
@@ -192,11 +247,14 @@ async def chat_loop(provider: str, model: str, story_id: int, storybase: str):
             recent_events = db.get_recent_events(story_id, limit=5)
             events_text = "\n".join([f"- {e['description']}" for e in recent_events])
             
-            # Simplified tool usage instruction
-            tool_instruction = ""
-            if tools:
-                tool_instruction = "You have access to the following external tools. If you need to use one, output a JSON block like {\"tool\": \"tool_name\", \"args\": {...}}.\n"
-                tool_instruction += "Available Tools:\n" + "\n".join([f"- {t['name']}: {t.get('description', '')}" for t in tools])
+            # Auto-Summarization Logic
+            turn_count += 1
+            if turn_count % 10 == 0:
+                console.print("[dim]Auto-summarizing story...[/dim]")
+                summary_prompt = f"Summarize the following recent events into the existing story summary. Keep it concise.\n\nExisting Summary:\n{story_summary}\n\nRecent Events:\n{events_text}"
+                new_summary = ai.generate_response(summary_prompt, model=model, provider=provider)
+                db.update_story_summary(story_id, new_summary)
+                story_summary = new_summary
 
             system_instruction = f"""
             You are an AI Storyteller/Dungeon Master.
@@ -210,76 +268,87 @@ async def chat_loop(provider: str, model: str, story_id: int, storybase: str):
             Relevant Lore:
             {relevant_lore}
             
-            {tool_instruction}
+            Note: Lore files starting with 'campaign_' represent specific campaign settings. Prioritize them if relevant.
             
             Your goal is to guide the player through the story.
             """
 
             with console.status("[bold green]Thinking...[/bold green]"):
+                # Pass tools to generate_response for native tool calling
                 response = ai.generate_response(
                     prompt=user_input,
                     system_instruction=system_instruction,
                     provider=provider,
-                    model=model
+                    model=model,
+                    tools=tools
                 )
 
-            # Check for tool calls (Naive implementation)
-            # In a real implementation, we'd use the provider's native tool calling capabilities
-            # Here we just check if the response looks like a tool call JSON
-            if response.strip().startswith("{") and "\"tool\"" in response:
-                try:
-                    tool_call = json.loads(response)
-                    tool_name = tool_call.get("tool")
-                    tool_args = tool_call.get("args", {})
+            # Handle Native Tool Calls (OpenAI/Anthropic return list of tool calls)
+            if isinstance(response, list):
+                for tool_call in response:
+                    # Extract tool details based on provider format
+                    # OpenAI: tool_call.function.name, tool_call.function.arguments (str)
+                    # Anthropic: tool_call["function"]["name"], tool_call["function"]["arguments"] (str)
                     
-                    # Find which server has this tool
+                    tool_name = ""
+                    tool_args_str = "{}"
+                    tool_call_id = None
+                    
+                    if hasattr(tool_call, 'function'): # OpenAI object
+                        tool_name = tool_call.function.name
+                        tool_args_str = tool_call.function.arguments
+                        tool_call_id = tool_call.id
+                    elif isinstance(tool_call, dict) and "function" in tool_call: # Anthropic dict
+                         tool_name = tool_call["function"]["name"]
+                         tool_args_str = tool_call["function"]["arguments"]
+                         tool_call_id = tool_call.get("id")
+
+                    try:
+                        tool_args = json.loads(tool_args_str)
+                    except json.JSONDecodeError:
+                        tool_args = {}
+
+                    # Find server
                     server_name = next((t["server_name"] for t in tools if t["name"] == tool_name), None)
                     
                     if server_name:
                         console.print(f"[dim]Calling tool {tool_name} on {server_name}...[/dim]")
                         
                         if server_name == "internal":
-                            # Execute internal tool
                             tool_func = next((t["function"] for t in internal_tools if t["name"] == tool_name), None)
                             if tool_func:
-                                # Inspect function signature to pass correct args
-                                # For simplicity, we'll try to pass args as kwargs
-                                # Note: Some internal tools need story_id which might not be in args if AI didn't provide it
-                                # We can inject it if missing and required
                                 import inspect
                                 sig = inspect.signature(tool_func)
                                 if "story_id" in sig.parameters and "story_id" not in tool_args:
                                     tool_args["story_id"] = story_id
-                                
                                 try:
                                     tool_result = tool_func(**tool_args)
                                 except Exception as e:
-                                    tool_result = f"Error executing internal tool: {e}"
+                                    tool_result = f"Error: {e}"
                             else:
-                                tool_result = "Error: Internal tool function not found."
+                                tool_result = "Error: Tool not found"
                         else:
-                            # Execute external tool
                             tool_result = await mcp_client.call_tool(server_name, tool_name, tool_args)
                         
-                        # Feed result back to AI
-                        # For simplicity, we just print it and ask AI to continue
-                        console.print(f"[dim]Tool Result: {tool_result}[/dim]")
+                        console.print(f"[dim]Result: {tool_result}[/dim]")
                         
-                        # Re-prompt AI with result
-                        follow_up_prompt = f"Tool {tool_name} returned: {tool_result}. Please continue the story."
+                        # Feed back to AI
+                        follow_up_prompt = f"Tool {tool_name} returned: {tool_result}. Continue."
+                        # Note: For proper chat history, we should append messages, but here we just follow up
+                        # A full chat history management is better for native tool use
                         response = ai.generate_response(
                             prompt=follow_up_prompt,
                             system_instruction=system_instruction,
                             provider=provider,
                             model=model
                         )
-                except json.JSONDecodeError:
-                    pass # Not valid JSON, treat as text
-
-            console.print(Markdown(response))
             
-            db.log_event(story_id, f"User: {user_input}")
-            db.log_event(story_id, f"AI: {response[:50]}...")
+            # If response is still a list (e.g. multiple tool calls), we might need a loop or handle it better
+            # For now, assume the final response is text
+            if isinstance(response, str):
+                console.print(Markdown(response))
+                db.log_event(story_id, f"User: {user_input}")
+                db.log_event(story_id, f"AI: {response[:50]}...")
 
     finally:
         await mcp_client.cleanup()

@@ -72,6 +72,30 @@ class DatabaseManager:
                 FOREIGN KEY (owner_id) REFERENCES characters (id)
             )
         ''')
+
+        # World State table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS world_state (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                story_id INTEGER,
+                key TEXT NOT NULL,
+                value TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (story_id) REFERENCES stories (id),
+                UNIQUE(story_id, key)
+            )
+        ''')
+
+        # Campaigns table (for template distribution)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS campaigns (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT,
+                lore_prefix TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
         
         conn.commit()
         conn.close()
@@ -146,3 +170,41 @@ class DatabaseManager:
         rows = cursor.fetchall()
         conn.close()
         return [dict(row) for row in rows][::-1]
+
+    def set_world_state(self, story_id: int, key: str, value: str):
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO world_state (story_id, key, value) VALUES (?, ?, ?) ON CONFLICT(story_id, key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP",
+            (story_id, key, value, value)
+        )
+        conn.commit()
+        conn.close()
+
+    def get_world_state(self, story_id: int) -> Dict[str, str]:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT key, value FROM world_state WHERE story_id = ?", (story_id,))
+        rows = cursor.fetchall()
+        conn.close()
+        return {row['key']: row['value'] for row in rows}
+
+    def create_campaign(self, name: str, description: str, lore_prefix: str) -> int:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO campaigns (name, description, lore_prefix) VALUES (?, ?, ?)",
+            (name, description, lore_prefix)
+        )
+        campaign_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return campaign_id
+
+    def list_campaigns(self) -> List[Dict[str, Any]]:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM campaigns")
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
