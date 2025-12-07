@@ -18,6 +18,7 @@ Storyteller is a CLI-based application that uses Large Language Models (LLMs) to
 | Topic | Description |
 |-------|-------------|
 | **[Setup Guide](docs/setup.md)** | Installation, API keys, and initialization. |
+| **[PyPI Installation](docs/pypi_install.md)** | Installing and using from PyPI. |
 | **[GitHub & Template Guide](docs/github_setup.md)** | Cloning, setup, and creating custom distributions. |
 | **[Database Guide](docs/db.md)** | Understanding the schema and managing save files. |
 | **[RAG & Vector Search](docs/rag.md)** | How the AI remembers lore using vector embeddings. |
