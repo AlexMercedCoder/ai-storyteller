@@ -18,6 +18,8 @@ Storyteller is a CLI-based application that uses Large Language Models (LLMs) to
 | Topic | Description |
 |-------|-------------|
 | **[Setup Guide](docs/setup.md)** | Installation, API keys, and initialization. |
+| **[GitHub & Template Guide](docs/github_setup.md)** | Cloning, setup, and creating custom distributions. |
+| **[Database Guide](docs/db.md)** | Understanding the schema and managing save files. |
 | **[Quick Start](docs/usage.md)** | Basic usage instructions. |
 | **[Chat Interface](docs/chat.md)** | Deep dive into how to play and interact. |
 | **[CLI Reference](docs/cli.md)** | Complete command list (`start`, `serve`, `dm-assist`). |
