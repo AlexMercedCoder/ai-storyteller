@@ -9,13 +9,23 @@ Storyteller now supports Retrieval-Augmented Generation (RAG) to allow the AI to
 3.  **Storage**: These vectors are stored locally in a LanceDB database (`db/lancedb`).
 4.  **Retrieval**: When you ask a question, the system searches for the most semantically similar lore chunks and feeds them to the AI.
 
-## Configuration
+## Configuration & Troubleshooting
 
-RAG is enabled by default if you have the dependencies installed.
+### Opting Out of RAG
+If you prefer to use the simple keyword search or want to save disk space, you can disable RAG by simply uninstalling the dependencies:
 
-To disable it (and fall back to keyword search), you would need to modify the code or uninstall `lancedb`/`sentence-transformers`.
+```bash
+pip uninstall lancedb sentence-transformers
+```
 
-## Troubleshooting
+Storyteller will automatically detect that these packages are missing and fall back to keyword search.
 
+### GPU Compatibility
+By default, Storyteller attempts to use your GPU for faster embedding generation. 
+
+- **Automatic Fallback**: If the application detects a GPU issue (e.g., CUDA errors or incompatibility), it will automatically fall back to using the CPU.
+- **Performance**: CPU embedding is generally fast enough for typical lore usage, so you shouldn't notice a significant slowdown unless you are ingesting thousands of documents at once.
+
+### Common Issues
 - **First Run Slowness**: The first time you run Storyteller, it downloads the embedding model (approx. 80MB). This happens only once.
 - **No Results**: Ensure your lore files are not empty and contain meaningful text.

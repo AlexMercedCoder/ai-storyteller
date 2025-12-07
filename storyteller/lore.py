@@ -31,7 +31,13 @@ class LoreManager:
             self.use_rag = False
 
     def _init_rag(self):
-        self.model = SentenceTransformer('all-MiniLM-L6-v2')
+        try:
+            # Try to use the default device (GPU if available)
+            self.model = SentenceTransformer('all-MiniLM-L6-v2')
+        except Exception as e:
+            print(f"Warning: Failed to initialize embedding model on default device ({e}). Falling back to CPU.")
+            self.model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
+            
         self.vector_db = lancedb.connect("db/lancedb")
         
         # Create table if not exists
@@ -86,8 +92,6 @@ class LoreManager:
                     for _, row in results_df.iterrows():
                         output.append(f"--- {row['topic'].upper()} (RAG Match) ---\n{row['text']}\n")
                     return "\n".join(output)
-                else:
-                    print("RAG search found no relevant results. Falling back to keyword search.")
             except Exception as e:
                 print(f"RAG search failed: {e}. Falling back to keyword search.")
         
