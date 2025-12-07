@@ -32,5 +32,5 @@ How to package and publish Storyteller (or your fork) to PyPI.
 Once published, users can install your version via pip:
 
 ```bash
-pip install ai-storyteller
+pip install ai-storyteller-cli
 ```
