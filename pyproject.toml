@@ -1,6 +1,6 @@
 [project]
 name = "ai-storyteller-cli"
-version = "0.2.0"
+version = "0.3.0"
 description = "AI Storyteller and DM Assistant"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,9 +13,13 @@ dependencies = [
     "anthropic>=0.3.0",
     "mcp>=0.1.0",
     "pydantic>=2.0.0",
+    "textual"
+]
+
+[project.optional-dependencies]
+rag = [
     "lancedb",
     "sentence-transformers",
-    "textual",
     "pandas"
 ]
 

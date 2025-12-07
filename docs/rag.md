@@ -11,8 +11,16 @@ Storyteller now supports Retrieval-Augmented Generation (RAG) to allow the AI to
 
 ## Configuration & Troubleshooting
 
-### Opting Out of RAG
-If you prefer to use the simple keyword search or want to save disk space, you can disable RAG by simply uninstalling the dependencies:
+### Installation
+
+RAG features require additional dependencies. If you installed the base package, RAG is disabled by default. To enable it, install the `rag` extras:
+
+```bash
+pip install "ai-storyteller-cli[rag]"
+```
+
+### Opting Out
+If you have the RAG dependencies installed but want to disable them (e.g. to save memory), you can uninstall them:
 
 ```bash
 pip uninstall lancedb sentence-transformers

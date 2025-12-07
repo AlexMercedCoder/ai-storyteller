@@ -37,7 +37,11 @@ Storyteller is a CLI-based application that uses Large Language Models (LLMs) to
 
 ## Quick Start
 
-1.  **Install**: `pip install .`
+1.  **Install**: ```bash
+pip install ai-storyteller-cli
+# OR for RAG support:
+pip install "ai-storyteller-cli[rag]"
+```
 2.  **Configure**: Create `.env` with API keys.
 3.  **Init**: `storyteller init`
 4.  **Play**: `storyteller start`

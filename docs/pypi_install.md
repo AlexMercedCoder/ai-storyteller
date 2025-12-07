@@ -10,6 +10,12 @@ Install the package using pip:
 pip install ai-storyteller-cli
 ```
 
+To enable **RAG (Vector Search)** features, install with the `rag` extra:
+
+```bash
+pip install "ai-storyteller-cli[rag]"
+```
+
 ## Configuration
 
 Before running the application, you need to set your API keys. You can do this by setting environment variables in your shell or by creating a `.env` file in your working directory.
